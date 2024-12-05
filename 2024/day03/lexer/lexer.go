@@ -18,10 +18,12 @@ const (
 	LParen    TokenType = "("
 	RParen    TokenType = ")"
 	Comma     TokenType = ","
-	IdentMult TokenType = "mul"
 	Int       TokenType = "INTEGER"
 	EOF       TokenType = "EOF"
 	Illegal   TokenType = "ILLEGAL"
+	IdentMult TokenType = "mul"
+	IdentDo   TokenType = "do"
+	IdentDont TokenType = "don't"
 )
 
 func createToken(kind TokenType, raw string) Token {
@@ -34,6 +36,12 @@ func createToken(kind TokenType, raw string) Token {
 func parseIdent(text string) (Token, bool) {
 	if strings.HasSuffix(text, string(IdentMult)) {
 		return createToken(IdentMult, text), true
+	}
+	if strings.HasSuffix(text, string(IdentDo)) {
+		return createToken(IdentDo, text), true
+	}
+	if strings.HasSuffix(text, string(IdentDont)) {
+		return createToken(IdentDont, text), true
 	}
 	return Token{}, false
 }
@@ -86,6 +94,8 @@ func (l *Lexer) readCharWhile(predicate Predicate[rune]) string {
 		}
 	}
 
+	// TODO: This can be improved to avoid the unread as we incorrectly
+	// push the last rune into the chars slice, which must be removed
 	l.unreadChar()
 
 	if len(chars) == 1 {
@@ -95,8 +105,10 @@ func (l *Lexer) readCharWhile(predicate Predicate[rune]) string {
 	}
 }
 
-func (l *Lexer) readAlpha() string {
-	return l.readCharWhile(unicode.IsLetter)
+func (l *Lexer) readIdent() string {
+	return l.readCharWhile(func(c rune) bool {
+		return c == '\'' || unicode.IsLetter(c)
+	})
 }
 
 func (l *Lexer) readInt() string {
@@ -118,7 +130,7 @@ func (l *Lexer) Tokens() []Token {
 		} else if l.ch == '\x00' {
 			break
 		} else if unicode.IsLetter(l.ch) {
-			text := l.readAlpha()
+			text := l.readIdent()
 			ident, ok := parseIdent(text)
 			if ok {
 				tokens = append(tokens, ident)

@@ -19,67 +19,81 @@ type Parser struct {
 	ops    []Operator
 	op     Operator
 
-	expected lexer.TokenType
+	expected []lexer.TokenType
 }
 
-func (parser *Parser) expectNext(kind lexer.TokenType) {
+func (parser *Parser) expectOne(kind lexer.TokenType) {
+	parser.expected = []lexer.TokenType{kind}
+}
+
+func (parser *Parser) expectAny(kind []lexer.TokenType) {
 	parser.expected = kind
 }
 
 func (parser *Parser) clear() {
-	parser.expected = lexer.IdentMult
+	parser.expectAny([]lexer.TokenType{lexer.IdentMult, lexer.IdentDont, lexer.IdentDo})
 	parser.op = nil
 }
 
-func (parser *Parser) Evaluate() int {
+func (parser *Parser) isExpected(kind lexer.TokenType) bool {
+	for _, e := range parser.expected {
+		if e == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func (parser *Parser) Parse() []Operator {
 	parser.clear()
 
 	for i, tok := range parser.tokens {
-		if tok.Kind != parser.expected {
+		if !parser.isExpected(tok.Kind) {
 			parser.clear()
 			continue
 		}
 
 		switch tok.Kind {
-		case lexer.IdentMult:
+		case lexer.LParen:
+			parser.expectAny([]lexer.TokenType{lexer.Int, lexer.RParen})
+		case lexer.Comma:
+			parser.expectOne(lexer.Int)
+		case lexer.RParen:
+			// This parser is really simple, when we reach the end of a function
+			// we capture the operation and reset the parser state to look for
+			// the next function
+			if parser.op != nil {
+				parser.ops = append(parser.ops, parser.op)
+			}
+			parser.clear()
+		case lexer.Int:
+			arg, err := strconv.Atoi(tok.Raw)
+			if err != nil {
+				// This should never happen as lexer.go should capture int sequences
+				panic(err)
+			}
+
+			// We're only handling arguments for lexer.IdentMult so if we've
+			// reached this point we need to parse the next sequence of ", int )"
+			// Functions can may/must only have two int arguments
+			if parser.tokens[i-1].Kind == lexer.LParen {
+				parser.op.SetArg1(arg)
+				parser.expectOne(lexer.Comma)
+			} else {
+				parser.op.SetArg2(arg)
+				parser.expectOne(lexer.RParen)
+			}
+		default:
 			op, err := NewOperator(tok)
 			if err != nil {
 				fmt.Println(err)
 				parser.clear()
 			} else {
 				parser.op = op
-				parser.expectNext(lexer.LParen)
-			}
-		case lexer.LParen:
-			parser.expectNext(lexer.Int)
-		case lexer.Comma:
-			parser.expectNext(lexer.Int)
-		case lexer.RParen:
-			if parser.op != nil {
-				parser.ops = append(parser.ops, parser.op)
-				parser.op = nil
-			}
-			parser.expectNext(lexer.IdentMult)
-		case lexer.Int:
-			arg, err := strconv.Atoi(tok.Raw)
-			if err != nil {
-				parser.clear()
-				continue
-			}
-			if parser.tokens[i-1].Kind == lexer.LParen {
-				parser.op.SetArg1(arg)
-				parser.expectNext(lexer.Comma)
-			} else {
-				parser.op.SetArg2(arg)
-				parser.expectNext(lexer.RParen)
+				parser.expectOne(lexer.LParen)
 			}
 		}
 	}
 
-	sum := 0
-	for _, op := range parser.ops {
-		sum += op.Result()
-	}
-
-	return sum
+	return parser.ops
 }

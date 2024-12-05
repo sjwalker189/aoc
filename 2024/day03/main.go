@@ -14,18 +14,45 @@ func main() {
 		os.Exit(1)
 	}
 
-	p1, p2 := Solve(string(input))
+	p1 := partOne(string(input))
+	p2 := partTwo(string(input))
 
 	fmt.Println("--- Day 03: Mull It Over ---")
 	fmt.Printf("Part One: %d\n", p1)
 	fmt.Printf("Part Two: %d\n", p2)
 }
 
-func Solve(input string) (int, int) {
+func parse(input string) []parser.Operator {
 	lex := lexer.NewLexer(input)
 	tokens := lex.Tokens()
 	parser := parser.NewParser(tokens)
-	value := parser.Evaluate()
+	return parser.Parse()
+}
 
-	return value, 0
+func partOne(input string) int {
+	sum := 0
+	for _, op := range parse(input) {
+		sum += op.Result()
+	}
+	return sum
+}
+
+func partTwo(input string) int {
+	sum := 0
+	ignore := false
+
+	for _, op := range parse(input) {
+		switch op.Name() {
+		case parser.OpDo:
+			ignore = false
+		case parser.OpDont:
+			ignore = true
+		case parser.OpMultiply:
+			if ignore == false {
+				sum += op.Result()
+			}
+		}
+	}
+
+	return sum
 }
