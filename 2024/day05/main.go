@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -96,11 +95,29 @@ func partTwo(input string) int {
 
 	sum := 0
 
+	// {1: {2: true}} means 1 preceeds 2
+	// TODO: consider updating part one solution to use same data structure
+	ruleMap := make(map[int]map[int]bool)
+	for _, rule := range rules {
+		if _, ok := ruleMap[rule.Left]; ok == false {
+			ruleMap[rule.Left] = make(map[int]bool)
+		}
+		ruleMap[rule.Left][rule.Right] = true
+	}
+
 	for _, update := range updates {
 		if !isCorrectlyOrdered(rules, update) {
-			// TODO
-			// mid := len(update) / 2
-			// sum += update[mid]
+
+			slices.SortFunc(update, func(a, b int) int {
+				// compare a against b by checking a proceeds b in the map
+				if !ruleMap[a][b] {
+					return 1
+				}
+				return -1
+			})
+
+			mid := len(update) / 2
+			sum += update[mid]
 		}
 	}
 
